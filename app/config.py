@@ -137,11 +137,11 @@ class AppConfig:
     speech_urgency_voice_strength_weight: float = 0.10
     speech_urgency_shouting_weight: float = 0.05
     yamnet_bucket_top_k: int = 5
-    crying_detect_threshold: float = 0.2
+    crying_detect_threshold: float = 0.40
     shouting_detect_threshold: float = 0.5
     impact_detect_threshold: float = 0.5
     silence_after_impact_detect_threshold: float = 0.65
-    fall_sound_detect_threshold: float = 0.5
+    fall_sound_detect_threshold: float = 0.45
     breathing_irregularity_detect_threshold: float = 0.4
     silence_after_impact_gate_threshold: float = 0.55
     yamnet_bucket_patterns: dict[str, tuple[str, ...]] = field(

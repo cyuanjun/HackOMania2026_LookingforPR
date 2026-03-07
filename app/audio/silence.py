@@ -95,7 +95,11 @@ def detect_silence_after_impact(
     impact_confidence: float = 1.0,
     impact_gate_threshold: float = 0.55,
 ) -> tuple[bool, float]:
-    """Score silence after a candidate impact location using post-impact RMS logic."""
+    """Score silence after impact using an early post-impact horizon.
+
+    This focuses on the first few seconds after impact and rewards contiguous
+    silent spans, which better matches fall-then-pause patterns.
+    """
 
     if impact_index is None or audio.size == 0 or impact_confidence < impact_gate_threshold:
         return False, 0.0
@@ -104,11 +108,25 @@ def detect_silence_after_impact(
     if post_audio.size == 0:
         return False, 0.0
 
-    silence = detect_silence_regions(post_audio, sample_rate, top_db=top_db)
+    # Restrict analysis to early post-impact audio, otherwise later speech/noise
+    # can dilute true short pauses.
+    analysis_horizon_sec = max(min_silence_sec * 2.0, 2.5)
+    horizon_samples = min(len(post_audio), max(int(sample_rate * analysis_horizon_sec), 1))
+    post_horizon = post_audio[:horizon_samples]
+
+    silence = detect_silence_regions(post_horizon, sample_rate, top_db=top_db)
     post_impact_silence_ratio = float(silence["silence_ratio"])
+    regions = silence.get("regions", []) or []
+    longest_silence_sec = max((max(end - start, 0.0) for start, end in regions), default=0.0)
+    longest_silence_score = float(np.clip(longest_silence_sec / max(min_silence_sec, 1e-6), 0.0, 1.0))
 
     pre_window = audio[max(0, impact_index - sample_rate // 2) : impact_index]
-    post_window = post_audio[: max(int(sample_rate * min_silence_sec), 1)]
+    # Skip a short burst right after impact, then evaluate sustained drop.
+    post_offset = min(int(sample_rate * 0.12), max(len(post_horizon) - 1, 0))
+    post_span = max(int(sample_rate * min_silence_sec), 1)
+    post_window = post_horizon[post_offset : post_offset + post_span]
+    if post_window.size == 0:
+        post_window = post_horizon[:post_span]
     if pre_window.size == 0:
         pre_window = audio[: max(int(sample_rate * 0.25), 1)]
 
@@ -116,5 +134,9 @@ def detect_silence_after_impact(
     post_rms = float(np.sqrt(np.mean(np.square(post_window)))) if post_window.size else 0.0
     rms_drop_score = float(np.clip((pre_rms - post_rms) / max(pre_rms, 1e-6), 0.0, 1.0))
 
-    confidence = np.clip((0.6 * post_impact_silence_ratio) + (0.4 * rms_drop_score), 0.0, 1.0)
+    confidence = np.clip(
+        (0.45 * longest_silence_score) + (0.35 * post_impact_silence_ratio) + (0.20 * rms_drop_score),
+        0.0,
+        1.0,
+    )
     return bool(confidence >= 0.45), round(float(confidence), 3)
