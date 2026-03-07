@@ -20,6 +20,7 @@ class AppConfig:
     peak_distance_sec: float = 0.18
     explanation_limit: int = 4
     use_optional_yamnet: bool = True
+    yamnet_model_url: str = "https://tfhub.dev/google/yamnet/1"
     use_llm_explanations: bool = True
     openai_whisper_model: str = "whisper-1"
     openai_translation_model: str = "gpt-4o-mini"
@@ -63,6 +64,7 @@ class AppConfig:
                 "chest pain",
                 "stroke",
                 "dizzy",
+                "heart",
             ),
             "fall_phrases": (
                 "fall",

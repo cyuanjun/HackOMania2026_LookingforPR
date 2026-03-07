@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
+import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -15,6 +17,41 @@ from app.config import AppConfig, DEFAULT_CONFIG
 
 def _clamp(value: float) -> float:
     return round(float(np.clip(value, 0.0, 1.0)), 3)
+
+
+def _clip01(value: float) -> float:
+    return float(np.clip(value, 0.0, 1.0))
+
+
+def _ensure_ssl_ca_bundle() -> None:
+    """Point HTTPS cert verification to certifi CA bundle when available."""
+
+    try:
+        import certifi
+    except Exception:
+        return
+
+    ca_path = certifi.where()
+    if ca_path:
+        os.environ.setdefault("SSL_CERT_FILE", ca_path)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_path)
+        os.environ.setdefault("CURL_CA_BUNDLE", ca_path)
+
+
+def _load_class_names_from_csv(csv_path: str) -> list[str]:
+    try:
+        with open(csv_path, "r", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            names: list[str] = []
+            for row in reader:
+                # YAMNet class map usually exposes "display_name".
+                if "display_name" in row and row["display_name"]:
+                    names.append(row["display_name"])
+                elif "name" in row and row["name"]:
+                    names.append(row["name"])
+            return names
+    except Exception:
+        return []
 
 
 def _optional_yamnet_scores(audio: np.ndarray, sample_rate: int, config: AppConfig) -> dict[str, float]:
@@ -39,7 +76,8 @@ def _optional_yamnet_scores(audio: np.ndarray, sample_rate: int, config: AppConf
         return scores
 
     try:
-        model = hub.load("https://tfhub.dev/google/yamnet/1")
+        _ensure_ssl_ca_bundle()
+        model = hub.load(config.yamnet_model_url)
         waveform = tf.convert_to_tensor(audio, dtype=tf.float32)
         yamnet_scores, *rest = model(waveform)
         mean_scores = np.mean(yamnet_scores.numpy(), axis=0)
@@ -54,6 +92,18 @@ def _optional_yamnet_scores(audio: np.ndarray, sample_rate: int, config: AppConf
             with tf.io.gfile.GFile(class_map_path) as csv_file:
                 reader = csv.DictReader(io.StringIO(csv_file.read()))
                 class_names = [row["display_name"] for row in reader]
+        if not class_names:
+            # Fallback: inspect resolved TF-Hub cache directory for class map CSV.
+            try:
+                resolved = hub.resolve(config.yamnet_model_url)
+                resolved_path = Path(str(resolved))
+                csv_candidates = sorted(resolved_path.rglob("*class_map*.csv"))
+                for candidate in csv_candidates:
+                    class_names = _load_class_names_from_csv(str(candidate))
+                    if class_names:
+                        break
+            except Exception:
+                pass
         if not class_names:
             return scores
 
@@ -74,7 +124,7 @@ def _optional_yamnet_scores(audio: np.ndarray, sample_rate: int, config: AppConf
             confidence = (0.7 * top_scores[0]) + (0.3 * float(np.mean(top_scores)))
             if bucket_name == "crying":
                 confidence = (0.85 * confidence) + (0.15 * top_scores[0])
-            return _clamp(confidence)
+            return _clip01(confidence)
 
         return {
             "crying": _bucket_confidence("crying"),

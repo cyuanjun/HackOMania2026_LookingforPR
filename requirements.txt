@@ -5,3 +5,7 @@ audioread>=3.0.1,<4
 pytest>=8.0,<9
 openai>=1.68,<2
 python-dotenv>=1.0,<2
+setuptools>=65
+tensorflow>=2.20,<2.22
+tensorflow_hub>=0.16,<0.17
+certifi>=2024.0.0
