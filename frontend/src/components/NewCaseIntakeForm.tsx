@@ -30,11 +30,15 @@ type CustomProfileFormState = {
   mobility_status: string;
   mobility_status_custom: string;
   caregiver_available: BoolSelect;
-  cardiac_risk_flag: BoolSelect;
-  fall_risk_flag: BoolSelect;
-  diabetes_flag: BoolSelect;
-  dementia_risk_flag: BoolSelect;
-  recent_discharge_flag: BoolSelect;
+  medical_age: string;
+  medical_mobility_status: string;
+  medical_mobility_status_custom: string;
+  preexisting_conditions: string;
+  medication_list: string;
+  discharge_date: string;
+  prior_falls_count: string;
+  cognitive_status: string;
+  cognitive_status_custom: string;
   calls_last_7d: string;
   calls_last_30d: string;
   false_alarm_rate: string;
@@ -50,11 +54,15 @@ const INITIAL_CUSTOM_PROFILE: CustomProfileFormState = {
   mobility_status: "assisted",
   mobility_status_custom: "",
   caregiver_available: "true",
-  cardiac_risk_flag: "false",
-  fall_risk_flag: "false",
-  diabetes_flag: "false",
-  dementia_risk_flag: "false",
-  recent_discharge_flag: "false",
+  medical_age: "70",
+  medical_mobility_status: "assisted",
+  medical_mobility_status_custom: "",
+  preexisting_conditions: "",
+  medication_list: "",
+  discharge_date: "",
+  prior_falls_count: "0",
+  cognitive_status: "clear",
+  cognitive_status_custom: "",
   calls_last_7d: "0",
   calls_last_30d: "0",
   false_alarm_rate: "0",
@@ -94,6 +102,27 @@ function parseDateTime(raw: string): string | null {
   }
 
   return parsed.toISOString();
+}
+
+function parseDateOnly(raw: string): string | undefined {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = new Date(`${normalized}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function parseStringList(raw: string): string[] {
+  return raw
+    .replaceAll(";", ",")
+    .replaceAll("|", ",")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 function displayValue(value: string | number | null | undefined): string {
@@ -291,15 +320,28 @@ export function NewCaseIntakeForm() {
   function buildCustomProfilePayload(): CustomProfileInput | null {
     const residentName = customProfile.resident_name.trim();
     const age = parseNonNegativeInt(customProfile.age);
+    const medicalAge = parseNonNegativeInt(customProfile.medical_age);
     const callsLast7d = parseNonNegativeInt(customProfile.calls_last_7d);
     const callsLast30d = parseNonNegativeInt(customProfile.calls_last_30d);
     const falseAlarmRate = parseNonNegativeFloat(customProfile.false_alarm_rate);
     const lastCallTimestamp = parseDateTime(customProfile.last_call_timestamp);
     const averageCallDuration = parseNonNegativeFloat(customProfile.average_call_duration);
+    const priorFallsCount = parseNonNegativeInt(customProfile.prior_falls_count);
+    const dischargeDate = parseDateOnly(customProfile.discharge_date);
     const mobilityStatus =
       customProfile.mobility_status === "other"
         ? customProfile.mobility_status_custom.trim()
         : customProfile.mobility_status;
+    const medicalMobilityStatus =
+      customProfile.medical_mobility_status === "other"
+        ? customProfile.medical_mobility_status_custom.trim()
+        : customProfile.medical_mobility_status;
+    const cognitiveStatus =
+      customProfile.cognitive_status === "other"
+        ? customProfile.cognitive_status_custom.trim()
+        : customProfile.cognitive_status;
+    const preexistingConditions = parseStringList(customProfile.preexisting_conditions);
+    const medicationList = parseStringList(customProfile.medication_list);
 
     if (!residentName) {
       setError("Enter resident name for custom profile.");
@@ -313,12 +355,28 @@ export function NewCaseIntakeForm() {
       setError("Custom age must be an integer from 0 to 130.");
       return null;
     }
+    if (medicalAge === null || medicalAge > 130) {
+      setError("Medical history age must be an integer from 0 to 130.");
+      return null;
+    }
     if (callsLast7d === null || callsLast30d === null) {
       setError("Call count fields must be non-negative integers.");
       return null;
     }
+    if (priorFallsCount === null) {
+      setError("Prior falls count must be a non-negative integer.");
+      return null;
+    }
     if (lastCallTimestamp === null) {
       setError("Last call timestamp is required and must be a valid date/time.");
+      return null;
+    }
+    if (!medicalMobilityStatus) {
+      setError("Enter a medical mobility status for custom profile.");
+      return null;
+    }
+    if (!cognitiveStatus) {
+      setError("Enter a cognitive status for custom profile.");
       return null;
     }
     if (
@@ -342,11 +400,13 @@ export function NewCaseIntakeForm() {
         caregiver_available: toBool(customProfile.caregiver_available),
       },
       medical_history: {
-        cardiac_risk_flag: toBool(customProfile.cardiac_risk_flag),
-        fall_risk_flag: toBool(customProfile.fall_risk_flag),
-        diabetes_flag: toBool(customProfile.diabetes_flag),
-        dementia_risk_flag: toBool(customProfile.dementia_risk_flag),
-        recent_discharge_flag: toBool(customProfile.recent_discharge_flag),
+        age: medicalAge,
+        mobility_status: medicalMobilityStatus,
+        preexisting_conditions: preexistingConditions,
+        medication_list: medicationList,
+        discharge_date: dischargeDate,
+        prior_falls_count: priorFallsCount,
+        cognitive_status: cognitiveStatus,
       },
       historical_call_history: {
         calls_last_7d: callsLast7d,
@@ -399,16 +459,24 @@ export function NewCaseIntakeForm() {
     try {
       const created = await createCaseIntake(payload);
       setCreatedCase(created);
-
-      const [latestCases, latestProfiles] = await Promise.all([fetchCases(), fetchProfiles()]);
-      setCases(latestCases);
-      setProfiles(latestProfiles);
+      setCases((current) => {
+        const exists = current.some((item) => item.case_id === created.case_id);
+        const next = exists
+          ? current.map((item) => (item.case_id === created.case_id ? created : item))
+          : [...current, created];
+        return next.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
 
       setSelectedAudioFile(null);
       setFileInputKey((value) => value + 1);
       if (isCustomProfile) {
         setProfileSelection(created.profile_id);
         setCustomProfile(INITIAL_CUSTOM_PROFILE);
+        fetchProfiles()
+          .then((rows) => setProfiles(rows))
+          .catch((err: Error) => setError(err.message));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create case.");
@@ -420,6 +488,22 @@ export function NewCaseIntakeForm() {
   async function onSelectOperatorAction(caseId: string, action: OperatorAction) {
     setError(null);
     setActingCaseId(caseId);
+    const previousCase = cases.find((item) => item.case_id === caseId);
+    const optimisticUpdatedAt = new Date().toISOString();
+
+    setCases((current) =>
+      current.map((item) =>
+        item.case_id === caseId
+          ? {
+              ...item,
+              status: "operator_processed",
+              operator_action: action,
+              actual_action: action,
+              last_updated_at: optimisticUpdatedAt,
+            }
+          : item
+      )
+    );
 
     try {
       const updatedCase = await setOperatorAction(caseId, action);
@@ -427,6 +511,11 @@ export function NewCaseIntakeForm() {
         current.map((item) => (item.case_id === updatedCase.case_id ? updatedCase : item))
       );
     } catch (err) {
+      if (previousCase) {
+        setCases((current) =>
+          current.map((item) => (item.case_id === previousCase.case_id ? previousCase : item))
+        );
+      }
       setError(err instanceof Error ? err.message : "Unable to set operator action.");
     } finally {
       setActingCaseId(null);
@@ -739,68 +828,113 @@ export function NewCaseIntakeForm() {
               <div className="profile-group">
                 <strong>2. Medical history</strong>
                 <label className="field">
-                  Cardiac risk flag
-                  <select
-                    value={customProfile.cardiac_risk_flag}
+                  Age
+                  <input
+                    type="number"
+                    min={0}
+                    max={130}
+                    value={customProfile.medical_age}
                     onChange={(event) =>
-                      handleCustomFieldChange("cardiac_risk_flag", event.target.value as BoolSelect)
+                      handleCustomFieldChange("medical_age", event.target.value)
                     }
-                  >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
+                    required={isCustomProfile}
+                  />
                 </label>
                 <label className="field">
-                  Fall risk flag
+                  Mobility status
                   <select
-                    value={customProfile.fall_risk_flag}
+                    value={customProfile.medical_mobility_status}
                     onChange={(event) =>
-                      handleCustomFieldChange("fall_risk_flag", event.target.value as BoolSelect)
+                      handleCustomFieldChange("medical_mobility_status", event.target.value)
                     }
                   >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
+                    <option value="independent">independent</option>
+                    <option value="assisted">assisted</option>
+                    <option value="limited">limited</option>
+                    <option value="wheelchair">wheelchair</option>
+                    <option value="bedridden">bedridden</option>
+                    <option value="other">other</option>
                   </select>
+                </label>
+                {customProfile.medical_mobility_status === "other" ? (
+                  <label className="field">
+                    Mobility status (custom)
+                    <input
+                      value={customProfile.medical_mobility_status_custom}
+                      onChange={(event) =>
+                        handleCustomFieldChange("medical_mobility_status_custom", event.target.value)
+                      }
+                      required={isCustomProfile && customProfile.medical_mobility_status === "other"}
+                    />
+                  </label>
+                ) : null}
+                <label className="field">
+                  Preexisting conditions (comma-separated)
+                  <input
+                    value={customProfile.preexisting_conditions}
+                    onChange={(event) =>
+                      handleCustomFieldChange("preexisting_conditions", event.target.value)
+                    }
+                  />
                 </label>
                 <label className="field">
-                  Diabetes flag
-                  <select
-                    value={customProfile.diabetes_flag}
+                  Medication list (comma-separated)
+                  <input
+                    value={customProfile.medication_list}
                     onChange={(event) =>
-                      handleCustomFieldChange("diabetes_flag", event.target.value as BoolSelect)
+                      handleCustomFieldChange("medication_list", event.target.value)
                     }
-                  >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
+                  />
                 </label>
                 <label className="field">
-                  Dementia risk flag
-                  <select
-                    value={customProfile.dementia_risk_flag}
+                  Discharge date
+                  <input
+                    type="date"
+                    value={customProfile.discharge_date}
                     onChange={(event) =>
-                      handleCustomFieldChange("dementia_risk_flag", event.target.value as BoolSelect)
+                      handleCustomFieldChange("discharge_date", event.target.value)
                     }
-                  >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
+                  />
                 </label>
                 <label className="field">
-                  Recent discharge flag
-                  <select
-                    value={customProfile.recent_discharge_flag}
+                  Prior falls count
+                  <input
+                    type="number"
+                    min={0}
+                    value={customProfile.prior_falls_count}
                     onChange={(event) =>
-                      handleCustomFieldChange(
-                        "recent_discharge_flag",
-                        event.target.value as BoolSelect
-                      )
+                      handleCustomFieldChange("prior_falls_count", event.target.value)
+                    }
+                    required={isCustomProfile}
+                  />
+                </label>
+                <label className="field">
+                  Cognitive status
+                  <select
+                    value={customProfile.cognitive_status}
+                    onChange={(event) =>
+                      handleCustomFieldChange("cognitive_status", event.target.value)
                     }
                   >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
+                    <option value="clear">clear</option>
+                    <option value="mild_impairment">mild_impairment</option>
+                    <option value="confused">confused</option>
+                    <option value="dementia">dementia</option>
+                    <option value="other">other</option>
                   </select>
                 </label>
+                {customProfile.cognitive_status === "other" ? (
+                  <label className="field">
+                    Cognitive status (custom)
+                    <input
+                      value={customProfile.cognitive_status_custom}
+                      onChange={(event) =>
+                        handleCustomFieldChange("cognitive_status_custom", event.target.value)
+                      }
+                      required={isCustomProfile && customProfile.cognitive_status === "other"}
+                    />
+                  </label>
+                ) : null}
               </div>
 
               <div className="profile-group">
@@ -914,10 +1048,32 @@ export function NewCaseIntakeForm() {
             </div>
             <div className="profile-group">
               <strong>2. Medical history</strong>
+              <div>Age: {selectedProfile.medical_history.age}</div>
+              <div>Mobility status: {displayValue(selectedProfile.medical_history.mobility_status)}</div>
+              <div>
+                Preexisting conditions:{" "}
+                {selectedProfile.medical_history.preexisting_conditions.length > 0
+                  ? selectedProfile.medical_history.preexisting_conditions.join(", ")
+                  : "-"}
+              </div>
+              <div>
+                Medication list:{" "}
+                {selectedProfile.medical_history.medication_list.length > 0
+                  ? selectedProfile.medical_history.medication_list.join(", ")
+                  : "-"}
+              </div>
+              <div>
+                Discharge date: {displayValue(selectedProfile.medical_history.discharge_date)}
+              </div>
+              <div>Prior falls count: {selectedProfile.medical_history.prior_falls_count}</div>
+              <div>Cognitive status: {displayValue(selectedProfile.medical_history.cognitive_status)}</div>
               <div>Cardiac risk flag: {String(selectedProfile.medical_history.cardiac_risk_flag)}</div>
               <div>Fall risk flag: {String(selectedProfile.medical_history.fall_risk_flag)}</div>
               <div>Diabetes flag: {String(selectedProfile.medical_history.diabetes_flag)}</div>
-              <div>Dementia risk flag: {String(selectedProfile.medical_history.dementia_risk_flag)}</div>
+              <div>
+                Dementia/confusion risk flag:{" "}
+                {String(selectedProfile.medical_history.dementia_confusion_risk_flag)}
+              </div>
               <div>Recent discharge flag: {String(selectedProfile.medical_history.recent_discharge_flag)}</div>
             </div>
             <div className="profile-group">

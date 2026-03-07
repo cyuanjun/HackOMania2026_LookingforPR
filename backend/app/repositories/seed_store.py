@@ -40,10 +40,17 @@ class SeedStore:
         "living_alone_flag",
         "mobility_status",
         "caregiver_available",
+        "medical_age",
+        "medical_mobility_status",
+        "preexisting_conditions",
+        "medication_list",
+        "discharge_date",
+        "prior_falls_count",
+        "cognitive_status",
         "cardiac_risk_flag",
         "fall_risk_flag",
         "diabetes_flag",
-        "dementia_risk_flag",
+        "dementia_confusion_risk_flag",
         "recent_discharge_flag",
         "calls_last_7d",
         "calls_last_30d",
@@ -155,14 +162,7 @@ class SeedStore:
         if not seed_profiles:
             return
 
-        existing_ids = set()
-        with self._engine.begin() as connection:
-            rows = connection.execute(select(self._profiles_table.c.profile_id)).all()
-            existing_ids = {cast(str, row[0]) for row in rows}
-
-        for profile_id, profile in seed_profiles.items():
-            if profile_id in existing_ids:
-                continue
+        for profile in seed_profiles.values():
             self.add_profile(profile)
 
     def _load_profiles_from_seed(self) -> dict[str, ProfileRecord]:
@@ -208,7 +208,9 @@ class SeedStore:
         return {row["profile_id"]: row for row in rows if row.get("profile_id")}
 
     @staticmethod
-    def _to_bool(raw: str) -> bool:
+    def _to_bool(raw: str | None) -> bool:
+        if raw is None:
+            return False
         normalized = raw.strip().lower()
         return normalized in {"1", "true", "yes", "y"}
 
@@ -219,12 +221,30 @@ class SeedStore:
         normalized = raw.strip()
         return normalized or None
 
+    @staticmethod
+    def _split_multi_value(raw: str | None) -> list[str]:
+        cleaned = SeedStore._clean_optional(raw)
+        if cleaned is None:
+            return []
+        normalized = cleaned.replace(";", "|").replace(",", "|")
+        return [item.strip() for item in normalized.split("|") if item.strip()]
+
     def _map_profile_rows(
         self,
         unit_row: dict[str, str],
         medical_row: dict[str, str],
         call_row: dict[str, str],
     ) -> dict:
+        medical_age = int(self._clean_optional(medical_row.get("age")) or unit_row["age"])
+        medical_mobility = (
+            self._clean_optional(medical_row.get("mobility_status")) or unit_row["mobility_status"]
+        )
+        prior_falls_count = int(self._clean_optional(medical_row.get("prior_falls_count")) or "0")
+        cognitive_status = self._clean_optional(medical_row.get("cognitive_status")) or "unknown"
+        dementia_flag_raw = (
+            medical_row.get("dementia_confusion_risk_flag") or medical_row.get("dementia_risk_flag")
+        )
+
         return {
             "profile_id": unit_row["profile_id"],
             "unit_patient_information": {
@@ -236,11 +256,20 @@ class SeedStore:
                 "caregiver_available": self._to_bool(unit_row["caregiver_available"]),
             },
             "medical_history": {
-                "cardiac_risk_flag": self._to_bool(medical_row["cardiac_risk_flag"]),
-                "fall_risk_flag": self._to_bool(medical_row["fall_risk_flag"]),
-                "diabetes_flag": self._to_bool(medical_row["diabetes_flag"]),
-                "dementia_risk_flag": self._to_bool(medical_row["dementia_risk_flag"]),
-                "recent_discharge_flag": self._to_bool(medical_row["recent_discharge_flag"]),
+                "age": medical_age,
+                "mobility_status": medical_mobility,
+                "preexisting_conditions": self._split_multi_value(
+                    medical_row.get("preexisting_conditions")
+                ),
+                "medication_list": self._split_multi_value(medical_row.get("medication_list")),
+                "discharge_date": self._clean_optional(medical_row.get("discharge_date")),
+                "prior_falls_count": prior_falls_count,
+                "cognitive_status": cognitive_status,
+                "cardiac_risk_flag": self._to_bool(medical_row.get("cardiac_risk_flag")),
+                "fall_risk_flag": self._to_bool(medical_row.get("fall_risk_flag")),
+                "diabetes_flag": self._to_bool(medical_row.get("diabetes_flag")),
+                "dementia_confusion_risk_flag": self._to_bool(dementia_flag_raw),
+                "recent_discharge_flag": self._to_bool(medical_row.get("recent_discharge_flag")),
             },
             "historical_call_history": {
                 "calls_last_7d": int(call_row["calls_last_7d"]),
@@ -487,10 +516,19 @@ class SeedStore:
             "living_alone_flag": self._to_csv_value(unit.living_alone_flag),
             "mobility_status": self._to_csv_value(unit.mobility_status),
             "caregiver_available": self._to_csv_value(unit.caregiver_available),
+            "medical_age": self._to_csv_value(medical.age),
+            "medical_mobility_status": self._to_csv_value(medical.mobility_status),
+            "preexisting_conditions": self._join_values(medical.preexisting_conditions),
+            "medication_list": self._join_values(medical.medication_list),
+            "discharge_date": self._to_csv_value(medical.discharge_date),
+            "prior_falls_count": self._to_csv_value(medical.prior_falls_count),
+            "cognitive_status": self._to_csv_value(medical.cognitive_status),
             "cardiac_risk_flag": self._to_csv_value(medical.cardiac_risk_flag),
             "fall_risk_flag": self._to_csv_value(medical.fall_risk_flag),
             "diabetes_flag": self._to_csv_value(medical.diabetes_flag),
-            "dementia_risk_flag": self._to_csv_value(medical.dementia_risk_flag),
+            "dementia_confusion_risk_flag": self._to_csv_value(
+                medical.dementia_confusion_risk_flag
+            ),
             "recent_discharge_flag": self._to_csv_value(medical.recent_discharge_flag),
             "calls_last_7d": self._to_csv_value(calls.calls_last_7d),
             "calls_last_30d": self._to_csv_value(calls.calls_last_30d),

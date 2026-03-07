@@ -9,10 +9,17 @@ export type ProfileRecord = {
     caregiver_available: boolean;
   };
   medical_history: {
+    age: number;
+    mobility_status: string;
+    preexisting_conditions: string[];
+    medication_list: string[];
+    discharge_date?: string;
+    prior_falls_count: number;
+    cognitive_status: string;
     cardiac_risk_flag: boolean;
     fall_risk_flag: boolean;
     diabetes_flag: boolean;
-    dementia_risk_flag: boolean;
+    dementia_confusion_risk_flag: boolean;
     recent_discharge_flag: boolean;
   };
   historical_call_history: {
@@ -62,11 +69,18 @@ export type CustomProfileInput = {
     caregiver_available: boolean;
   };
   medical_history: {
-    cardiac_risk_flag: boolean;
-    fall_risk_flag: boolean;
-    diabetes_flag: boolean;
-    dementia_risk_flag: boolean;
-    recent_discharge_flag: boolean;
+    age: number;
+    mobility_status: string;
+    preexisting_conditions: string[];
+    medication_list: string[];
+    discharge_date?: string;
+    prior_falls_count: number;
+    cognitive_status: string;
+    cardiac_risk_flag?: boolean;
+    fall_risk_flag?: boolean;
+    diabetes_flag?: boolean;
+    dementia_confusion_risk_flag?: boolean;
+    recent_discharge_flag?: boolean;
   };
   historical_call_history: {
     calls_last_7d: number;

@@ -1,4 +1,4 @@
-profile_id,cardiac_risk_flag,fall_risk_flag,diabetes_flag,dementia_risk_flag,recent_discharge_flag
-profile-001,true,true,true,false,false
-profile-002,true,false,false,false,true
-profile-003,false,true,false,true,true
+profile_id,age,mobility_status,preexisting_conditions,medication_list,discharge_date,prior_falls_count,cognitive_status,fall_risk_flag,cardiac_risk_flag,diabetes_flag,dementia_confusion_risk_flag,recent_discharge_flag
+profile-001,78,limited,hypertension|diabetes|osteoarthritis,metformin|amlodipine,2026-01-10,2,clear,true,true,true,false,false
+profile-002,69,assisted,coronary artery disease,aspirin|atorvastatin,2026-03-01,0,clear,false,true,false,false,true
+profile-003,83,wheelchair,dementia|hypertension,donepezil,2026-02-20,3,dementia,true,true,false,true,true

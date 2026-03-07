@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 CaseStatus = Literal["unprocessed", "processed", "operator_processed"]
@@ -120,11 +120,67 @@ class UnitPatientInformation(BaseModel):
 
 
 class MedicalHistory(BaseModel):
-    cardiac_risk_flag: bool
-    fall_risk_flag: bool
-    diabetes_flag: bool
-    dementia_risk_flag: bool
-    recent_discharge_flag: bool
+    age: int = Field(default=0, ge=0, le=130)
+    mobility_status: str = Field(default="unknown", min_length=1, max_length=100)
+    preexisting_conditions: list[str] = Field(default_factory=list)
+    medication_list: list[str] = Field(default_factory=list)
+    discharge_date: date | None = None
+    prior_falls_count: int = Field(default=0, ge=0)
+    cognitive_status: str = Field(default="unknown", min_length=1, max_length=100)
+    fall_risk_flag: bool = False
+    cardiac_risk_flag: bool = False
+    diabetes_flag: bool = False
+    dementia_confusion_risk_flag: bool = False
+    recent_discharge_flag: bool = False
+
+    @field_validator("preexisting_conditions", "medication_list", mode="before")
+    @classmethod
+    def _normalize_string_list(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            parts = [chunk.strip() for chunk in value.replace(";", "|").replace(",", "|").split("|")]
+            return [part for part in parts if part]
+        return []
+
+    @model_validator(mode="after")
+    def _compute_derived_flags(self) -> "MedicalHistory":
+        conditions = " ".join(item.lower() for item in self.preexisting_conditions)
+        medications = " ".join(item.lower() for item in self.medication_list)
+        mobility = self.mobility_status.strip().lower()
+        cognitive = self.cognitive_status.strip().lower()
+
+        cardiac_terms = ("cardiac", "heart", "arrhythmia", "hypertension", "stroke", "coronary", "chf")
+        diabetes_terms = ("diabetes", "insulin", "metformin", "glucose")
+        dementia_terms = ("dementia", "confusion", "alzheimer", "cognitive")
+
+        cardiac_derived = any(term in conditions for term in cardiac_terms) or any(
+            term in medications for term in cardiac_terms
+        )
+        diabetes_derived = any(term in conditions for term in diabetes_terms) or any(
+            term in medications for term in diabetes_terms
+        )
+        dementia_derived = any(term in conditions for term in dementia_terms) or any(
+            term in cognitive for term in dementia_terms
+        )
+        mobility_derived = mobility in {"limited", "wheelchair", "bedridden"} or ("limited" in mobility)
+        fall_derived = self.prior_falls_count > 0 or mobility_derived or dementia_derived or self.age >= 75
+
+        recent_discharge_derived = False
+        if self.discharge_date is not None:
+            days_since_discharge = (date.today() - self.discharge_date).days
+            recent_discharge_derived = 0 <= days_since_discharge <= 30
+
+        self.cardiac_risk_flag = bool(self.cardiac_risk_flag or cardiac_derived)
+        self.diabetes_flag = bool(self.diabetes_flag or diabetes_derived)
+        self.dementia_confusion_risk_flag = bool(
+            self.dementia_confusion_risk_flag or dementia_derived
+        )
+        self.fall_risk_flag = bool(self.fall_risk_flag or fall_derived)
+        self.recent_discharge_flag = bool(self.recent_discharge_flag or recent_discharge_derived)
+        return self
 
 
 class HistoricalCallHistory(BaseModel):

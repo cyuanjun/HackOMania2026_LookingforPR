@@ -115,10 +115,15 @@ def evaluate_case(
             factors, "diabetes", "Diabetes comorbidity in profile.", "risk_up", 0.7, "medical_history"
         )
 
-    if medical.dementia_risk_flag:
+    if medical.dementia_confusion_risk_flag:
         score += 1.0
         _add_factor(
-            factors, "dementia_risk", "Dementia-risk increases ambiguity and delay.", "risk_up", 1.0, "medical_history"
+            factors,
+            "dementia_confusion_risk",
+            "Dementia/confusion risk increases ambiguity and delay.",
+            "risk_up",
+            1.0,
+            "medical_history",
         )
 
     if medical.recent_discharge_flag:
