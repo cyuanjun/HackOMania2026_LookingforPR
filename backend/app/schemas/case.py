@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
@@ -61,14 +63,51 @@ class CaseRecord(BaseModel):
     emergency_type: str | None = Field(default=None, max_length=100)
     distress_level: Literal["high", "medium", "low"] | None = None
     confidence: float | None = Field(default=None, ge=0, le=1)
+    false_alarm_probability: float | None = Field(default=None, ge=0, le=1)
     recommended_action: str | None = Field(default=None, max_length=100)
     operator_action: OperatorAction | None = None
+    actual_severity: Literal["high", "medium", "low"] | None = None
+    actual_action: OperatorAction | None = None
+    actual_false_alarm: bool | None = None
+    actual_emergency_type: str | None = Field(default=None, max_length=100)
+    outcome_notes: str | None = Field(default=None, max_length=500)
+    outcome_recorded_at: datetime | None = None
     top_contributing_reasons: list[str] = Field(default_factory=list)
     audio_module: AudioModuleInput | None = None
     intake_artifacts: list[IntakeArtifact] = Field(default_factory=list)
     score_result: ScoreResult | None = None
     created_at: datetime = Field(default_factory=utc_now)
     last_updated_at: datetime = Field(default_factory=utc_now)
+
+
+class CaseOutcomeRequest(BaseModel):
+    actual_severity: Literal["high", "medium", "low"]
+    actual_action: OperatorAction | None = None
+    actual_false_alarm: bool | None = None
+    actual_emergency_type: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class TrainingRecord(BaseModel):
+    case_id: str
+    profile_id: str
+    unit_patient_information: UnitPatientInformation
+    medical_history: MedicalHistory
+    historical_call_history: HistoricalCallHistory
+    audio_module: AudioModuleInput | None = None
+    predicted_emergency_type: str | None = Field(default=None, max_length=100)
+    predicted_severity: Literal["high", "medium", "low"] | None = None
+    predicted_action: OperatorAction | None = None
+    predicted_confidence: float | None = Field(default=None, ge=0, le=1)
+    predicted_false_alarm_probability: float | None = Field(default=None, ge=0, le=1)
+    predicted_top_contributing_reasons: list[str] = Field(default_factory=list)
+    predicted_at: datetime = Field(default_factory=utc_now)
+    actual_severity: Literal["high", "medium", "low"] | None = None
+    actual_action: OperatorAction | None = None
+    actual_false_alarm: bool | None = None
+    actual_emergency_type: str | None = Field(default=None, max_length=100)
+    outcome_notes: str | None = Field(default=None, max_length=500)
+    outcome_recorded_at: datetime | None = None
 
 
 class UnitPatientInformation(BaseModel):
@@ -92,8 +131,10 @@ class HistoricalCallHistory(BaseModel):
     calls_last_7d: int = Field(ge=0)
     calls_last_30d: int = Field(ge=0)
     false_alarm_rate: float = Field(ge=0, le=1)
-    time_since_last_call: int = Field(ge=0)
-    average_call_duration: float = Field(ge=0)
+    last_call_timestamp: datetime = Field(
+        description="Timestamp of the most recent call in ISO-8601 format."
+    )
+    average_call_duration: float = Field(ge=0, description="Average call duration in seconds.")
 
 
 class ProfileRecord(BaseModel):

@@ -330,6 +330,43 @@ main {
   padding: 10px 12px;
 }
 
+.actual-severity-section {
+  margin-top: 10px;
+  border-top: 1px solid #d9e3f2;
+  padding-top: 10px;
+}
+
+.severity-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.actual-severity-value {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #2b3f67;
+}
+
+.severity-high {
+  background: #ffe9e9;
+  border-color: #efb4b4;
+  color: #8b1a1a;
+}
+
+.severity-medium {
+  background: #fff5e8;
+  border-color: #efcfac;
+  color: #8a4f10;
+}
+
+.severity-low {
+  background: #eaf8ee;
+  border-color: #b8dfc4;
+  color: #1e6a3a;
+}
+
 .action-ambulance {
   background: #ffe9e9;
   border-color: #efb4b4;

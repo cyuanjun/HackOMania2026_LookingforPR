@@ -1,0 +1,4 @@
+profile_id,cardiac_risk_flag,fall_risk_flag,diabetes_flag,dementia_risk_flag,recent_discharge_flag
+profile-001,true,true,true,false,false
+profile-002,true,false,false,false,true
+profile-003,false,true,false,true,true

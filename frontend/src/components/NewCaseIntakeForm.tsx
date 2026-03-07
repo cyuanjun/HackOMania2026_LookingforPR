@@ -2,13 +2,20 @@
 
 import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 
-import { createCaseIntake, fetchCases, fetchProfiles, setOperatorAction } from "@/lib/api";
+import {
+  createCaseIntake,
+  fetchCases,
+  fetchProfiles,
+  setCaseOutcome,
+  setOperatorAction
+} from "@/lib/api";
 import {
   CaseRecord,
   CaseIntakePayload,
   CustomProfileInput,
   OperatorAction,
-  ProfileRecord
+  ProfileRecord,
+  SeverityLevel
 } from "@/types";
 
 const CUSTOM_PROFILE_OPTION = "__custom__";
@@ -31,7 +38,7 @@ type CustomProfileFormState = {
   calls_last_7d: string;
   calls_last_30d: string;
   false_alarm_rate: string;
-  time_since_last_call: string;
+  last_call_timestamp: string;
   average_call_duration: string;
 };
 
@@ -51,7 +58,7 @@ const INITIAL_CUSTOM_PROFILE: CustomProfileFormState = {
   calls_last_7d: "0",
   calls_last_30d: "0",
   false_alarm_rate: "0",
-  time_since_last_call: "0",
+  last_call_timestamp: "",
   average_call_duration: "0",
 };
 
@@ -75,6 +82,20 @@ function parseNonNegativeFloat(raw: string): number | null {
   return value;
 }
 
+function parseDateTime(raw: string): string | null {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
 function displayValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return "-";
@@ -93,6 +114,18 @@ function displayLivingAlone(value: boolean | null | undefined): string {
   }
 
   return value ? "Yes" : "No";
+}
+
+function displayDateTimeValue(value: string | null | undefined): string {
+  if (!value || value.trim() === "") {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
 }
 
 function formatConfidenceValue(value: number | null | undefined): string {
@@ -155,6 +188,30 @@ function toFeatureLabel(key: string, sourceModule: string): string {
   return `${feature} (${source})`;
 }
 
+function severityLabel(level: SeverityLevel): string {
+  if (level === "high") {
+    return "High";
+  }
+  if (level === "medium") {
+    return "Medium";
+  }
+  return "Low";
+}
+
+function severityButtonClass(level: SeverityLevel): string {
+  if (level === "high") {
+    return "severity-high";
+  }
+  if (level === "medium") {
+    return "severity-medium";
+  }
+  return "severity-low";
+}
+
+function severityConfirmationText(level: SeverityLevel): string {
+  return `Confirm actual severity: ${severityLabel(level)}?`;
+}
+
 type FeatureBreakdownRow = {
   feature: string;
   confidence: string;
@@ -170,6 +227,7 @@ export function NewCaseIntakeForm() {
     useState<CustomProfileFormState>(INITIAL_CUSTOM_PROFILE);
   const [submitting, setSubmitting] = useState(false);
   const [actingCaseId, setActingCaseId] = useState<string | null>(null);
+  const [settingOutcomeCaseId, setSettingOutcomeCaseId] = useState<string | null>(null);
   const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdCase, setCreatedCase] = useState<CaseRecord | null>(null);
@@ -236,7 +294,7 @@ export function NewCaseIntakeForm() {
     const callsLast7d = parseNonNegativeInt(customProfile.calls_last_7d);
     const callsLast30d = parseNonNegativeInt(customProfile.calls_last_30d);
     const falseAlarmRate = parseNonNegativeFloat(customProfile.false_alarm_rate);
-    const timeSinceLastCall = parseNonNegativeInt(customProfile.time_since_last_call);
+    const lastCallTimestamp = parseDateTime(customProfile.last_call_timestamp);
     const averageCallDuration = parseNonNegativeFloat(customProfile.average_call_duration);
     const mobilityStatus =
       customProfile.mobility_status === "other"
@@ -255,8 +313,12 @@ export function NewCaseIntakeForm() {
       setError("Custom age must be an integer from 0 to 130.");
       return null;
     }
-    if (callsLast7d === null || callsLast30d === null || timeSinceLastCall === null) {
-      setError("Call count and time fields must be non-negative integers.");
+    if (callsLast7d === null || callsLast30d === null) {
+      setError("Call count fields must be non-negative integers.");
+      return null;
+    }
+    if (lastCallTimestamp === null) {
+      setError("Last call timestamp is required and must be a valid date/time.");
       return null;
     }
     if (
@@ -264,7 +326,9 @@ export function NewCaseIntakeForm() {
       falseAlarmRate > 1 ||
       averageCallDuration === null
     ) {
-      setError("False alarm rate must be 0 to 1, and average duration must be non-negative.");
+      setError(
+        "False alarm rate must be 0 to 1, and average call duration (seconds) must be non-negative."
+      );
       return null;
     }
 
@@ -288,7 +352,7 @@ export function NewCaseIntakeForm() {
         calls_last_7d: callsLast7d,
         calls_last_30d: callsLast30d,
         false_alarm_rate: falseAlarmRate,
-        time_since_last_call: timeSinceLastCall,
+        last_call_timestamp: lastCallTimestamp,
         average_call_duration: averageCallDuration,
       },
     };
@@ -369,6 +433,22 @@ export function NewCaseIntakeForm() {
     }
   }
 
+  async function onSelectActualSeverity(caseId: string, actualSeverity: SeverityLevel) {
+    setError(null);
+    setSettingOutcomeCaseId(caseId);
+
+    try {
+      const updatedCase = await setCaseOutcome(caseId, { actual_severity: actualSeverity });
+      setCases((current) =>
+        current.map((item) => (item.case_id === updatedCase.case_id ? updatedCase : item))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to set actual severity.");
+    } finally {
+      setSettingOutcomeCaseId(null);
+    }
+  }
+
   function toggleCaseExpansion(caseId: string) {
     setExpandedCaseId((current) => (current === caseId ? null : caseId));
   }
@@ -425,6 +505,14 @@ export function NewCaseIntakeForm() {
         feature: "Estimated emergency type",
         confidence: "-",
         reason: item.audio_module.estimated_emergency_type,
+      });
+    }
+
+    if (item.false_alarm_probability !== null && item.false_alarm_probability !== undefined) {
+      fallbackRows.push({
+        feature: "False alarm probability (call history)",
+        confidence: formatConfidenceValue(item.false_alarm_probability),
+        reason: "Estimated from recent call behavior and historical false-alarm rate.",
       });
     }
 
@@ -493,6 +581,40 @@ export function NewCaseIntakeForm() {
             {actingCaseId === caseId ? "Submitting..." : actionLabel(action)}
           </button>
         ))}
+      </div>
+    );
+  }
+
+  function renderActualSeverityButtons(item: CaseRecord) {
+    const levels: SeverityLevel[] = ["high", "medium", "low"];
+    const isSubmittingOutcome = settingOutcomeCaseId === item.case_id;
+
+    return (
+      <div className="actual-severity-section">
+        <strong>Actual Severity</strong>
+        <div className="severity-actions">
+          {levels.map((level) => (
+            <button
+              key={level}
+              type="button"
+              className={`secondary-btn ${severityButtonClass(level)}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                const confirmed = window.confirm(severityConfirmationText(level));
+                if (!confirmed) {
+                  return;
+                }
+                onSelectActualSeverity(item.case_id, level);
+              }}
+              disabled={isSubmittingOutcome}
+            >
+              {isSubmittingOutcome ? "Saving..." : severityLabel(level)}
+            </button>
+          ))}
+        </div>
+        <div className="actual-severity-value">
+          Recorded: {displayValue(item.actual_severity)}
+        </div>
       </div>
     );
   }
@@ -722,22 +844,22 @@ export function NewCaseIntakeForm() {
                   />
                 </label>
                 <label className="field">
-                  Time since last call
+                  Last call timestamp
                   <input
-                    type="number"
-                    min={0}
-                    value={customProfile.time_since_last_call}
+                    type="datetime-local"
+                    value={customProfile.last_call_timestamp}
                     onChange={(event) =>
-                      handleCustomFieldChange("time_since_last_call", event.target.value)
+                      handleCustomFieldChange("last_call_timestamp", event.target.value)
                     }
                     required={isCustomProfile}
                   />
                 </label>
                 <label className="field">
-                  Average call duration
+                  Average call duration (seconds)
                   <input
                     type="number"
                     min={0}
+                    max={20}
                     step={0.1}
                     value={customProfile.average_call_duration}
                     onChange={(event) =>
@@ -803,8 +925,14 @@ export function NewCaseIntakeForm() {
               <div>Calls last 7d: {selectedProfile.historical_call_history.calls_last_7d}</div>
               <div>Calls last 30d: {selectedProfile.historical_call_history.calls_last_30d}</div>
               <div>False alarm rate: {selectedProfile.historical_call_history.false_alarm_rate}</div>
-              <div>Time since last call: {selectedProfile.historical_call_history.time_since_last_call}</div>
-              <div>Average call duration: {selectedProfile.historical_call_history.average_call_duration}</div>
+              <div>
+                Last call timestamp:{" "}
+                {displayDateTimeValue(selectedProfile.historical_call_history.last_call_timestamp)}
+              </div>
+              <div>
+                Average call duration (seconds):{" "}
+                {selectedProfile.historical_call_history.average_call_duration}
+              </div>
             </div>
           </div>
         ) : null}
@@ -1004,6 +1132,7 @@ export function NewCaseIntakeForm() {
                                 <div className="operator-action-section">
                                   <strong>Chosen Action</strong>
                                   <div>{displayValue(item.operator_action)}</div>
+                                  {renderActualSeverityButtons(item)}
                                 </div>
                               </div>
                             </td>

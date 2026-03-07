@@ -19,7 +19,7 @@ export type ProfileRecord = {
     calls_last_7d: number;
     calls_last_30d: number;
     false_alarm_rate: number;
-    time_since_last_call: number;
+    last_call_timestamp: string;
     average_call_duration: number;
   };
 };
@@ -35,10 +35,20 @@ export type OperatorAction =
   | "community_response"
   | "ambulance_dispatch";
 
+export type SeverityLevel = "high" | "medium" | "low";
+
 export type CaseIntakePayload = {
   profile_id?: string;
   custom_profile?: CustomProfileInput;
   intake_artifacts: IntakeArtifactInput[];
+};
+
+export type CaseOutcomePayload = {
+  actual_severity: SeverityLevel;
+  actual_action?: OperatorAction;
+  actual_false_alarm?: boolean;
+  actual_emergency_type?: string;
+  notes?: string;
 };
 
 export type CustomProfileInput = {
@@ -62,7 +72,7 @@ export type CustomProfileInput = {
     calls_last_7d: number;
     calls_last_30d: number;
     false_alarm_rate: number;
-    time_since_last_call: number;
+    last_call_timestamp: string;
     average_call_duration: number;
   };
 };
@@ -72,10 +82,17 @@ export type CaseRecord = {
   profile_id: string;
   status: "unprocessed" | "processed" | "operator_processed";
   emergency_type?: string;
-  distress_level?: "high" | "medium" | "low";
+  distress_level?: SeverityLevel;
   confidence?: number;
+  false_alarm_probability?: number;
   recommended_action?: string;
   operator_action?: OperatorAction;
+  actual_severity?: SeverityLevel;
+  actual_action?: OperatorAction;
+  actual_false_alarm?: boolean;
+  actual_emergency_type?: string;
+  outcome_notes?: string;
+  outcome_recorded_at?: string;
   top_contributing_reasons?: string[];
   score_result?: {
     score: number;
@@ -99,4 +116,26 @@ export type CaseRecord = {
   };
   created_at: string;
   last_updated_at?: string;
+};
+
+export type TrainingRecord = {
+  case_id: string;
+  profile_id: string;
+  unit_patient_information: ProfileRecord["unit_patient_information"];
+  medical_history: ProfileRecord["medical_history"];
+  historical_call_history: ProfileRecord["historical_call_history"];
+  audio_module?: CaseRecord["audio_module"];
+  predicted_emergency_type?: string;
+  predicted_severity?: SeverityLevel;
+  predicted_action?: OperatorAction;
+  predicted_confidence?: number;
+  predicted_false_alarm_probability?: number;
+  predicted_top_contributing_reasons: string[];
+  predicted_at: string;
+  actual_severity?: SeverityLevel;
+  actual_action?: OperatorAction;
+  actual_false_alarm?: boolean;
+  actual_emergency_type?: string;
+  outcome_notes?: string;
+  outcome_recorded_at?: string;
 };

@@ -1,0 +1,4 @@
+profile_id,unit_block,resident_name,age,living_alone_flag,mobility_status,caregiver_available
+profile-001,BLK-120A-08-122,Aisha Rahman,78,true,limited,true
+profile-002,BLK-214C-03-077,Lim Wei Jie,69,false,assisted,true
+profile-003,BLK-311B-10-201,Kumar Devi,83,true,wheelchair,false

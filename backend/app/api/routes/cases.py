@@ -1,7 +1,12 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from app.dependencies import store
-from app.schemas.case import CaseIntakeRequest, OperatorActionRequest, ProfileRecord
+from app.schemas.case import (
+    CaseIntakeRequest,
+    CaseOutcomeRequest,
+    OperatorActionRequest,
+    ProfileRecord,
+)
 
 
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -13,8 +18,14 @@ def list_cases() -> dict:
     return {"data": {"cases": [case.model_dump(mode="json") for case in cases]}}
 
 
+@router.get("/training-records")
+def list_training_records() -> dict:
+    records = store.list_training_records()
+    return {"data": {"training_records": [record.model_dump(mode="json") for record in records]}}
+
+
 @router.post("/intake")
-def intake_case(payload: CaseIntakeRequest, background_tasks: BackgroundTasks) -> dict:
+def intake_case(payload: CaseIntakeRequest) -> dict:
     if payload.profile_id and payload.custom_profile:
         raise HTTPException(
             status_code=400,
@@ -44,7 +55,9 @@ def intake_case(payload: CaseIntakeRequest, background_tasks: BackgroundTasks) -
         )
 
     case = store.create_case_from_intake(payload, profile_id=resolved_profile_id)
-    background_tasks.add_task(store.process_case, case.case_id)
+    processed_case = store.process_case(case.case_id)
+    if processed_case is not None:
+        case = processed_case
     return {"data": {"case": case.model_dump(mode="json")}}
 
 
@@ -60,6 +73,15 @@ def process_case(case_id: str) -> dict:
 @router.post("/{case_id}/operator-action")
 def set_operator_action(case_id: str, payload: OperatorActionRequest) -> dict:
     case = store.set_operator_action(case_id, payload.action)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Unknown case_id.")
+
+    return {"data": {"case": case.model_dump(mode="json")}}
+
+
+@router.post("/{case_id}/outcome")
+def set_case_outcome(case_id: str, payload: CaseOutcomeRequest) -> dict:
+    case = store.set_case_outcome(case_id, payload)
     if case is None:
         raise HTTPException(status_code=404, detail="Unknown case_id.")
 

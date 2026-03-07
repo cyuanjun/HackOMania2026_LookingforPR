@@ -1,4 +1,11 @@
-import { CaseIntakePayload, CaseRecord, OperatorAction, ProfileRecord } from "@/types";
+import {
+  CaseIntakePayload,
+  CaseOutcomePayload,
+  CaseRecord,
+  OperatorAction,
+  ProfileRecord,
+  TrainingRecord,
+} from "@/types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -18,6 +25,12 @@ type IntakeResponse = {
 type CasesResponse = {
   data: {
     cases: CaseRecord[];
+  };
+};
+
+type TrainingRecordsResponse = {
+  data: {
+    training_records: TrainingRecord[];
   };
 };
 
@@ -98,4 +111,36 @@ export async function setOperatorAction(
 
   const json: CaseResponse = await response.json();
   return json.data.case;
+}
+
+export async function setCaseOutcome(
+  caseId: string,
+  payload: CaseOutcomePayload
+): Promise<CaseRecord> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/outcome`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Unable to set case outcome.");
+  }
+
+  const json: CaseResponse = await response.json();
+  return json.data.case;
+}
+
+export async function fetchTrainingRecords(): Promise<TrainingRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/cases/training-records`, {
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error("Unable to fetch training records.");
+  }
+
+  const json: TrainingRecordsResponse = await response.json();
+  return json.data.training_records;
 }
