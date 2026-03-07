@@ -1,0 +1,2 @@
+# HackOMania2026-Multimodal_AI_Emergency_Triage_Architecture
+HackOMania2026 GovTech project
