@@ -21,8 +21,8 @@ class AppConfig:
     explanation_limit: int = 4
     use_optional_yamnet: bool = True
     yamnet_bucket_top_k: int = 3
-    crying_detect_threshold: float = 0.6
-    shouting_detect_threshold: float = 0.6
+    crying_detect_threshold: float = 0.5
+    shouting_detect_threshold: float = 0.5
     impact_detect_threshold: float = 0.6
     silence_after_impact_detect_threshold: float = 0.65
     fall_sound_detect_threshold: float = 0.65
@@ -30,7 +30,19 @@ class AppConfig:
     silence_after_impact_gate_threshold: float = 0.55
     yamnet_bucket_patterns: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: {
-            "crying": ("crying", "sobbing", "whimper", "moan", "groan", "wail"),
+            "crying": (
+                "crying",
+                "sobbing",
+                "sob",
+                "whimper",
+                "moan",
+                "groan",
+                "wail",
+                "whine",
+                "sniff",
+                "lament",
+                "bawl",
+            ),
             "shouting": ("shout", "yell", "scream", "shriek"),
             "impact": ("thud", "bang", "crash", "slam", "breaking", "smash", "thump", "thwack"),
             "breathing": ("breathing", "wheeze", "gasp", "snoring", "pant", "respir"),

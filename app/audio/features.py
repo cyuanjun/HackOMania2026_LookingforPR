@@ -147,7 +147,7 @@ def extract_acoustic_features(
         "peak_count": int(len(peak_indices)),
         "sudden_impact_score": round(float(sudden_impact_score), 3),
         "breathing_variability_score": round(float(min(breathing_variability / 1.5, 1.0)), 3),
-        "unstable_modulation_score": round(float(unstable_modulation), 3),
+        "unstable_modulation_score": round(float(min((0.85 * unstable_modulation) + (0.15 * min(breathing_variability / 1.2, 1.0)), 1.0)), 3),
         "sustained_high_energy_score": round(float(sustained_high_energy_score), 3),
         "peak_indices": peak_indices,
         "peak_index": peak_index,

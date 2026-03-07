@@ -71,7 +71,10 @@ def _optional_yamnet_scores(audio: np.ndarray, sample_rate: int, config: AppConf
                 return 0.0
             matched_scores.sort(reverse=True)
             top_scores = matched_scores[: config.yamnet_bucket_top_k]
-            return _clamp((0.7 * top_scores[0]) + (0.3 * float(np.mean(top_scores))))
+            confidence = (0.7 * top_scores[0]) + (0.3 * float(np.mean(top_scores)))
+            if bucket_name == "crying":
+                confidence = (0.85 * confidence) + (0.15 * top_scores[0])
+            return _clamp(confidence)
 
         return {
             "crying": _bucket_confidence("crying"),
@@ -139,16 +142,27 @@ def detect_events(
         silence_ratio = float(features["silence_ratio"])
         impact_score = float(features["sudden_impact_score"])
         breathing_var = float(features["breathing_variability_score"])
+        low_energy_score = float(np.clip(1.0 - (rms_mean / 0.12), 0.0, 1.0))
+        crying_texture_score = float(
+            np.clip(
+                (0.4 * unstable_modulation)
+                + (0.25 * silence_ratio)
+                + (0.2 * breathing_var)
+                + (0.15 * low_energy_score),
+                0.0,
+                1.0,
+            )
+        )
 
         if yamnet_available:
             # YAMNet is the primary evidence source; heuristics only refine confidence.
-            crying_conf = _clamp((0.8 * yamnet["crying"]) + (0.2 * unstable_modulation))
+            crying_conf = _clamp((0.58 * yamnet["crying"]) + (0.42 * crying_texture_score))
             shouting_conf = _clamp((0.7 * yamnet["shouting"]) + (0.3 * sustained_high_energy))
             impact_conf = _clamp((0.5 * yamnet["impact"]) + (0.5 * impact_score))
             breathing_conf = _clamp((0.75 * yamnet["breathing"]) + (0.25 * breathing_var))
         else:
             # If YAMNet is unavailable, keep the pipeline alive with conservative heuristic-only scores.
-            crying_conf = _clamp(unstable_modulation)
+            crying_conf = _clamp((0.85 * crying_texture_score) + (0.15 * min(breathing_var, 0.8)))
             shouting_conf = _clamp(sustained_high_energy)
             impact_conf = _clamp((0.9 * impact_score) + (0.1 * min(features["peak_count"], 1.0)))
             breathing_conf = _clamp(breathing_var * max(0.0, 1.0 - impact_score))
@@ -165,10 +179,12 @@ def detect_events(
 
         explanations: list[tuple[float, str]] = []
         if crying_conf >= 0.45:
-            if yamnet["crying"] > 0.0 and unstable_modulation > 0.15:
+            if yamnet["crying"] > 0.0 and crying_texture_score > 0.2:
                 explanations.append((crying_conf, "YAMNet detected crying-like audio and the signal showed unstable amplitude modulation."))
             elif yamnet["crying"] > 0.0:
                 explanations.append((crying_conf, "YAMNet detected crying-like audio patterns."))
+            else:
+                explanations.append((crying_conf, "Low-energy unstable vocal texture resembles crying-like audio."))
         if shouting_conf >= 0.45:
             if yamnet["shouting"] > 0.0 and sustained_high_energy > 0.2:
                 explanations.append((shouting_conf, "YAMNet detected shouting-like audio and energy stayed elevated over time."))

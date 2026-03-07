@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import subprocess
 import wave
 
 import numpy as np
@@ -55,6 +56,32 @@ def _load_with_wave(path: Path) -> tuple[np.ndarray, int, int]:
     return np.asarray(audio, dtype=np.float32), int(sample_rate), int(channels)
 
 
+def _load_with_ffmpeg(path: Path) -> tuple[np.ndarray, int, int]:
+    """Decode compressed formats through ffmpeg when Python decoders are unavailable."""
+
+    cmd = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        str(path),
+        "-f",
+        "f32le",
+        "-acodec",
+        "pcm_f32le",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-",
+    ]
+    result = subprocess.run(cmd, capture_output=True, check=True)
+    audio = np.frombuffer(result.stdout, dtype=np.float32)
+    if audio.size == 0:
+        raise ValueError(f"ffmpeg produced no audio for {path}")
+    return audio, 16_000, 1
+
+
 def _resample_linear(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
     if orig_sr == target_sr or audio.size == 0:
         return audio.astype(np.float32)
@@ -84,7 +111,7 @@ def load_audio(audio_path: str | Path, config: AppConfig = DEFAULT_CONFIG) -> di
     loaders = [_load_with_soundfile]
     if path.suffix.lower() == ".wav":
         loaders.append(_load_with_wave)
-    loaders.append(_load_with_librosa)
+    loaders.extend((_load_with_librosa, _load_with_ffmpeg))
 
     for loader in loaders:
         try:
