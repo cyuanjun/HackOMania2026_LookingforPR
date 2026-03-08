@@ -1,0 +1,9 @@
+profile_id,diagnoses,allergies,medications,last_discharge_date,notes
+p001,hypertension|atrial_fibrillation|type_2_diabetes,penicillin,metformin|losartan|apixaban,2026-02-20,Recent weakness episode with near-fall at night
+p002,coronary_artery_disease|hypertension|chronic_kidney_disease,none,aspirin|atorvastatin|amlodipine,2026-01-30,Intermittent chest tightness on exertion
+p003,asthma|copd,dust_mite,salbutamol_inhaler|budesonide,2025-12-15,Night-time breathlessness during humid weather
+p004,osteoporosis|peripheral_neuropathy,ibuprofen,gabapentin|calcium_supplement,2025-11-22,History of bathroom slips and painful standing after falls
+p005,dementia|hypertension,none,donepezil|amlodipine,2025-10-05,Occasional confusion about time and location
+p006,hyperlipidemia,none,atorvastatin,2025-07-11,Mild dizziness reported after missing meals
+p007,osteoarthritis,none,paracetamol,2025-05-18,Frequent non-emergency button presses for reassurance
+p008,type_2_diabetes,none,metformin,2025-06-02,Generally stable with occasional anxiety-related check-ins

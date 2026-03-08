@@ -1,0 +1,9 @@
+profile_id,total_calls_last_30d,urgent_calls_last_30d,false_alarm_count_last_30d,last_call_outcome,recent_call_summaries
+p001,6,3,0,ambulance_dispatch,possible stroke signs|unable to stand safely|severe weakness reported
+p002,5,2,0,ambulance_dispatch,chest discomfort with short breath|rapid heartbeat episode
+p003,7,2,1,community_response,breathing discomfort resolved with inhaler|night panic alert
+p004,8,2,2,community_response,bathroom slip with leg pain|needed welfare check after fall
+p005,6,1,1,community_response,confusion and disorientation at corridor|missed medication follow-up
+p006,3,0,1,operator_callback,meal-related dizziness resolved by callback|routine reassurance request
+p007,9,0,6,operator_callback,multiple accidental button presses|requested non-urgent reassurance
+p008,4,0,1,operator_callback,requested emotional support callback|minor non-urgent dizziness

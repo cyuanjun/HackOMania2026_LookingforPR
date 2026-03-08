@@ -1,0 +1,2 @@
+"""HackOMania backend package."""
+

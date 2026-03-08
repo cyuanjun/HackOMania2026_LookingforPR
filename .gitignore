@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+*_venv/
+
+# Node
+node_modules/
+.next/
+npm-debug.log*
+*.tsbuildinfo
+
+# Local runtime case data
+backend/data/cases/*.json
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+
+# Local temp/reference folders and logs
+_tmp_ref_repo/
+backend/tmp_*.log
