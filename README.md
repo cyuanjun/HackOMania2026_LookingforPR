@@ -8,6 +8,22 @@ This project is a monorepo MVP that helps operators monitor incoming alert cases
 
 ---
 
+## Team
+
+**Chia Yuan Jun**
+- GitHub: [@cyuanjun](https://github.com/cyuanjun)  
+- LinkedIn: [Chia Yuan Jun](https://www.linkedin.com/in/chia-yuan-jun/)
+- 
+**Lee Jinseo (Jason)**
+- GitHub:  
+- LinkedIn: [Jinseo Lee](https://www.linkedin.com/in/jinseo-lee-58b255341/)
+
+**Su Yi Maung (Monica)**
+- GitHub:
+- LinkedIn: [Monica Cheng](https://www.linkedin.com/in/monica-cheng-873512292/)
+
+---
+
 ## Overview
 
 When a PAB alert is triggered, operators often need to make decisions quickly with incomplete information. This project aims to support that workflow by combining:
