@@ -1,6 +1,51 @@
 # HackOMania 2026 - PAB Triage MVP
 
-Monorepo scaffold for an AI-assisted triage dashboard for Personal Alert Button (PAB) alerts.
+# HackOMania 2026 — Looking for PR
+
+AI-assisted triage dashboard for **Personal Alert Button (PAB)** alerts, built for **HackOMania 2026**.
+
+This project is a monorepo MVP that helps operators monitor incoming alert cases, review AI-assisted triage outputs, and make faster response decisions using resident context, call history, and audio-derived signals.
+
+---
+
+## Overview
+
+When a PAB alert is triggered, operators often need to make decisions quickly with incomplete information. This project aims to support that workflow by combining:
+
+- **Resident context** from structured records
+- **Audio analysis** from prerecorded or uploaded clips
+- **Language / dialect handling**
+- **Rule-based triage fusion**
+- **Operator review and final action tracking**
+
+The current implementation is designed as a **modular MVP**, with clean separation between frontend, backend, and persistence so it can evolve into a production-ready system later.
+
+---
+
+## Key Features
+
+- **Operator dashboard** for viewing and managing alert cases
+- **FastAPI backend** for case handling and API services
+- **Next.js frontend** for a clean web-based interface
+- **Resident context lookup** from CSV-backed repositories
+- **Case persistence** using JSON files
+- **Audio upload pipeline scaffold**
+- **Language detection, transcription, and translation hooks**
+- **Derived medical / history flags**
+- **Fusion-based triage engine**
+- **Case workflow state transitions**
+- Future-ready repository abstraction for **Supabase or database migration**
+
+---
+
+## Repository Structure
+
+```text
+.
+├── backend/     # FastAPI service, repositories, tests, local data storage
+├── frontend/    # Next.js + TypeScript + Tailwind dashboard
+├── docs/        # Architecture notes
+└── EXTRA/       # Extra materials / supporting files
 
 ## Structure
 
